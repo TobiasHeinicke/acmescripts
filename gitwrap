@@ -1,0 +1,29 @@
+#!/bin/sh
+
+if [ -z "$winid" ]; then
+	exit 1
+fi
+
+9p read acme/$winid/body | sed -n '1p' > /tmp/firstLine
+fold -w 50 -s /tmp/firstLine > /tmp/firstLineWrapped
+
+9p read acme/$winid/body | sed -n '2,$p' | sed -n '/^[^#]/p' > /tmp/noComment
+fold -w 72 -s /tmp/noComment > /tmp/noCommentWrapped
+
+9p read acme/$winid/body | sed -n '/^#/p' > /tmp/Comment
+
+cat /tmp/firstLineWrapped > /tmp/editedCommitMsg
+printf "\n" >> /tmp/editedCommitMsg
+cat /tmp/noCommentWrapped /tmp/Comment  >> /tmp/editedCommitMsg
+
+9p read acme/$winid/body | diff - /tmp/editedCommitMsg
+if [ $? -ne 0 ]; then
+	LEN=`9p read acme/$winid/ctl | sed 's/\s\+[0-9]\+\s\+[0-9]\+\s\+\([0-9]*\).*/\1/'`
+	STR=""
+	for i in `seq 1 $LEN`; do
+		STR="$STR\b"
+	done
+	printf "$STR" | 9p write acme/$winid/body
+	cat /tmp/editedCommitMsg | 9p write acme/$winid/body
+	echo dirty | 9p write acme/$winid/ctl
+fi
